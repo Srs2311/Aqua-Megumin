@@ -1,0 +1,13 @@
+to-do.txt
+*.env
+__pycache__/*
+bin/*
+gifs/*
+image_library/*
+json/*.json
+lib/*
+lib64/*
+pictures/*
+docker-compose.yaml
+*.cfg
+lib64

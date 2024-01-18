@@ -1,0 +1,15 @@
+version: '0.1'
+services:
+  aqua-and-megumin-dev:
+    image: discord-telegram-bot-dev
+    container_name: aqua-and-megumin-dev
+    restart: always
+    volumes:
+      - ./json:/usr/src/app/json
+      - ./image_library:/usr/src/app/image_library
+    environment:
+      - TELEGRAM_TOKEN=TELEGRAM_TOKEN
+      - TELEGRAM_CHAT=TELGRAM_CHAT_ID
+      - DISCORD_TOKEN=DISCORD_BOT_TOKEN
+      - BRIDGE=DISCORD_BRIDGE_CHANNEL_ID
+      - IMAGE_LIBRARY=DISCORD_IMAGE_LIBRARY_CHANNEL_ID
