@@ -17,14 +17,13 @@ async def trim(self,message):
         
 async def ignore_channel(self,message):
     if admin_check(self,message):
-        with open("./json/ignored_channels.json","r") as ignored_channels:
-            channels = json.load(ignored_channels) 
-        if message.channel not in channels:
+        with open("./json/config.json","r") as config:
+            config = json.load(config) 
+        if message.channel not in config["telegram_bridge"]["ignored_channels"]:
             channel_info = {}
-            channel = message.channel
-            channel_info["name"] = str(channel.name)
-            channel_info["id"] = str(channel.id)
-            channels.append(channel_info)
-            with open ("./json/ignored_channels.json","w") as ignored_channels_writeable:
-                ignored_channels_writeable.write(json.dumps(channels))
+            channel_info["name"] = str(message.channel.name)
+            channel_info["id"] = str(message.channel.id)
+            config["telegram_bridge"]["ignored_channels"].append(channel_info)
+            with open ("./json/config.json","w") as config_writeable:
+                config_writeable.write(json.dumps(config))
 

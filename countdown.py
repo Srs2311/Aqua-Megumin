@@ -10,10 +10,19 @@ def refresh_events():
         return events,event_names
 
 
-def add_countdown(bot,message):
+def add_countdown(message):
     events,event_names =  refresh_events()
-    countdownInfo = str(message.text).replace("/addCountdown ","")
+    if "/addCountDown" in message:
+        countdownInfo = str(message).replace("/addCountDown ","")
+    elif "/addCountdown" in message:
+        countdownInfo = str(message).replace("/addCountdown ","")
+    elif "/addcountdown" in message:
+        countdownInfo = str(message).replace("/addcountdown ","")
+    elif "/add_countdown" in message:
+        countdownInfo = str(message).replace("/add_countdown ","")
+    
     countdownInfo = countdownInfo.split("|")
+    print(countdownInfo)
     mdy = countdownInfo[1].strip().split("/")
     
     countdown_json = {}
@@ -44,14 +53,19 @@ def add_countdown(bot,message):
         events.append(countdown_json)
         with open("./json/events.json","w") as events_file:
             events_file.write(json.dumps(events))
-            bot.send_message(message.chat.id,f"Added countdown: {countdown_json["name"]}")
+            response = f"Added countdown: {countdown_json["name"]}"
+    return(response)
     
-def countdown(bot,message):
+def countdown(message):
     events,event_names =  refresh_events()
-    countdown_name = str(message.text).replace("/countdown ","")
+    countdown_name = str(message).replace("/countdown ","")
     for event in events:
         if countdown_name.lower() in event["name"].lower():
             td = datetime.datetime(int(event["year"]),int(event["month"]),int(event["day"]),int(event["hour"]),int(event["minute"]),int(event["seconds"])) - datetime.datetime.now()
             hms = str(datetime.timedelta(seconds=td.seconds))
             hms = hms.split(":")
-            bot.send_message(message.chat.id,f"{event["name"]} in {td.days} days {hms[0]} hours {hms[1]} minutes {hms[2]} seconds")
+            response = f"{event["name"]} in {td.days} days {hms[0]} hours {hms[1]} minutes {hms[2]} seconds"
+    if response:
+        return response
+    else:
+        return("Could not find countdown")

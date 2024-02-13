@@ -5,13 +5,23 @@ import requests
 import telegram_images as t_images
 import magic_eight_ball as magic8ball
 import quotes
-import telegram_countdown as t_countdown
+import countdown as t_countdown
+import dice_roll
+import telegram_to_discord as t2d
 from environment_control import *
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode=None)
 
 #discord api call headers
 headers = {'Authorization': f"Bot {DISCORD_TOKEN}"}
+
+def load_settings():
+    with open("./json/config.json") as config:
+        settings = json.load(config)
+        return settings
+
+
+settings = load_settings()
 
 #------------------------------------------------------------------------------------------------------------------------#
 @bot.message_handler(commands=['add_quote','addquote'])
@@ -47,12 +57,22 @@ def whoami(message):
 def eight_ball(message):
     response = magic8ball.magic_eight_ball()
     bot.send_message(message.chat.id,response)
-    
+    bridge_commands(message,response)
 
+@bot.message_handler(commands=["roll"])
+def roll(message):
+    text = str(message.text).replace("/roll ","")
+    response = dice_roll.roll_dice(text)
+    responseStr = ""
+    for i in range(0,len(response)):
+        responseStr = f"{response[i]}   {responseStr}"
+    bot.send_message(message.chat.id,responseStr)
+    bridge_commands(message,responseStr)
 
 #command to pull an image from image.json and post in chat
 @bot.message_handler(commands=["img"])
 def send_image(message):
+    bridge_commands(message,None)
     t_images.send_image_from_library(bot,message)
     
 
@@ -84,8 +104,14 @@ def add_gif(message):
     with open("./gifs.json","w") as imagesList:
             imagesList.write(json.dumps(gif_list))
 
+@bot.message_handler(content_types="video")
+def video_bridge(message):
+    print("video handler")
+    t2d.bridge_video(message)
+
 @bot.message_handler(content_types=["animation"])
 def add_gif(message):
+    print("gif handler")
     #checks if gif has a caption, which is where commands would be stored
     if message.caption:
         if "/addgif" in message.caption:
@@ -121,63 +147,72 @@ def add_gif(message):
     json={"content": f"{message.from_user.username}: {message.text}"}
     )
 
-
 @bot.message_handler(commands=["addphoto"])
 def add_photo_with_reply(message):
     t_images.add_photo(bot,message)
 
 @bot.message_handler(content_types=["photo"])
-def add_photo(message):
+def photo_handler(message):
     if message.caption:
         if "/addphoto" in message.caption:
             t_images.add_photo(bot,message)
     #image bridging
     t_images.download_telegram_image(bot,message,name=str(message.photo[-1].file_unique_id))
-    t_images.send_photo_to_discord(BRIDGE,f"./pictures/{message.photo[-1].file_unique_id}.png",str(message.photo[-1].file_unique_id),f"{message.from_user.username}: {message.caption if message.caption else ""}")
+    if settings["discord_bridge"]["use_embeds"] == True:
+        t2d.bridge_photo_embed(message)
+    
+@bot.message_handler(content_types=["sticker"])
+def sticker_handler(message):
+    t2d.sticker_embed(message)
 
 #gets chatid of a telegram chat, mostly a developer feature
 @bot.message_handler(commands=["chatid"])
 def send_chat_id(message):
     bot.send_message(message.chat.id,f"Chat ID: {message.chat.id}")
     
-@bot.message_handler(commands=["userInfo"])
+@bot.message_handler(commands=["userInfo","userinfo"])
 def send_user_info(message):
+    photos = bot.get_user_profile_photos(message.from_user.id)
+    pfp = photos.photos[0][0]
     bot.send_message(message.chat.id,f"{message.from_user}")
-
+    bot.send_photo(message.chat.id,photo=str(pfp.file_id))
+    t2d.bridge_message_embed(message)
+    
 @bot.message_handler(commands=["countdown"])
 def countdown(message):
-    t_countdown.countdown(bot,message)
+    response = t_countdown.countdown(str(message.text))
+    bot.send_message(message.chat.id,response)
+    bridge_commands(message,response)
 
 @bot.message_handler(commands=["addCountdown","addcountdown"])
 def add_countdown(message):
-    t_countdown.add_countdown(bot,message)
+    response = t_countdown.add_countdown(message.text)
+    bot.send_message(message.chat.id,response)
+    bridge_commands(message,response)
 
 @bot.message_handler(commands=["generateImageLibrary"])
-def generate_image_library():
+def generate_image_library(message):
     t_images.generate_image_library()
 
 #forwards non-command and non-image messages    
 @bot.message_handler(func=lambda m: True)
 def discord_bridge(message):
-    requests.post(
-    f"https://discord.com/api/v6/channels/{BRIDGE}/messages",
-    headers=headers, 
-    json={"content": f"{message.from_user.username}: {message.text}"}
-)
-
+    print(message)
+    if message.text:
+        t2d.bridge_message_embed(message)
+    if message.photo:
+        t2d.bridge_photo_embed(message)
+    if message.sticker:
+        t2d.sticker_embed(message)
 #sends command and response to discord, called in other functions
 def bridge_commands(message,response):
-    requests.post(
-    f"https://discord.com/api/v6/channels/{BRIDGE}/messages",
-    headers=headers, 
-    json={"content": f"{message.from_user.username}: {message.text}"}
-        )
-    
-    requests.post(
-    f"https://discord.com/api/v6/channels/{BRIDGE}/messages",
-    headers=headers, 
-    json={"content": f"{response}"}
-    )
+    if settings["discord_bridge"]["use_embeds"] == True:
+        t2d.bridge_message_embed(message)
+    else:
+        t2d.bridge_message(message)
+         
+    if response != None:
+        t2d.bridge_message(response)
 
 bot.infinity_polling()
 

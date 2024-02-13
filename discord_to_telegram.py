@@ -1,0 +1,15 @@
+from environment_control import *
+import telebot
+
+bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode=None) # You can set parse_mode by default. HTML or MARKDOWN
+
+def bridge_message(photo_url,message):
+    #if a photo url was grabbed, bridges the photo
+    if len(photo_url) > 0:
+        if ".mp4" in photo_url:
+            bot.send_video(chat_id,photo_url,caption=f"{message.author}: {message.content}")
+        else:
+            bot.send_photo(chat_id,photo_url,caption=f"{message.author}: {message.content}")
+        #If not, just bridges the message text
+    else:
+        bot.send_message(chat_id,f"{message.author}: {message.content}")

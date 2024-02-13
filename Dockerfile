@@ -2,6 +2,9 @@ FROM python:3
 
 WORKDIR /usr/src/app
 
+ENV TZ="America/Denver"
+RUN date
+
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN mkdir ./image_library/
