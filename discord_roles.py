@@ -64,3 +64,10 @@ async def generate_role_message(role_chat):
     print(role_json)
     with open("./json/role_message.json","w") as role_message_json:
         role_message_json.write(json.dumps(role_json))
+
+async def list_roles(message):
+    role_list = refresh_server_roles(message)
+    response = ""
+    for role in role_list:
+        response = (f"{response} {role.name} \n {role.id} \n \n")
+    await message.channel.send(response)

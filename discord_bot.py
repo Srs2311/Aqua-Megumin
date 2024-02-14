@@ -22,10 +22,9 @@ from environment_control import *
 def refresh_settings():
     with open("./json/config.json","r") as settings:
         settings = json.load(settings)
-    settings = settings.get("telegram_bridge", None)
     
     ignored_channel_ids = []
-    for channel in settings["ignored_channels"]:
+    for channel in settings["telegram_bridge"]["ignored_channels"]:
         ignored_channel_ids.append(channel.get("id",None))
     return settings,ignored_channel_ids
 
@@ -42,7 +41,6 @@ class MyClient(discord.Client):
         
     
     async def on_message(self, message):
-        image_library = client.get_channel(IMAGE_LIBRARY)
         settings,ignored_channels = refresh_settings()
         
         # don't respond to ourselves
@@ -59,14 +57,17 @@ class MyClient(discord.Client):
         except:
             photo_url = ""
         
-        #/addphoto command, adds a photo to the library
-        if str(message.content).startswith("/addphoto"):
-            await d_images.add_photo(self,message)
-            
-        elif str(message.content).startswith("/list_roles"):
-            role_list = discord_roles.refresh_server_roles(self,message)
-            await message.channel.send(role_list)
+#<------------------------USEFUL, BUT FUN COMMANDS------------------------------------->
         
+        #/addphoto command, adds a photo to the library
+        if str(message.content).lower().startswith("/addphoto") or str(message.content).lower().startswith("/add_photo"):
+            await d_images.add_photo(self, message, image_gallery=client.get_channel(int(settings.get("discord_settings").get("image_gallery"))))
+            
+        #img command send a requested image
+        elif str(message.content).startswith("/img"):
+            await d_images.send_image(self,message)
+        
+        #sends the time until a requested countdown
         elif str(message.content).startswith("/countdown"):
             response = countdown.countdown(message.content)
             bridge = client.get_channel(BRIDGE_CHAT)
@@ -74,26 +75,19 @@ class MyClient(discord.Client):
             bot.send_message(TELEGRAM_CHAT,f"{message.author}: {message.content}")
             bot.send_message(TELEGRAM_CHAT,response)
         
-        elif str(message.content).lower().startswith("/embed"):
-            embed = discord.Embed(title="Testing embeds",color=0xFF5733,description="Test embed description")
-            embed.set_author(name="test-author-name",icon_url="https://api.telegram.org/file/bot6821711407:AAFdTigOH1Xh53VhxR_ETSt2B_wzHk2OfKY/photos/file_29.jpg")
+        #adds a countdown  
+        elif str(message.content).lower().startswith("/add_countdown"):
+            response = countdown.add_countdown(message.content)
             bridge = client.get_channel(BRIDGE_CHAT)
-            await bridge.send(embed=embed)
+            await bridge.send((response))
+            bot.send_message(TELEGRAM_CHAT,f"{message.author}: {message.content}")
+            bot.send_message(TELEGRAM_CHAT,f"{response}")
 
-        elif str(message.content).lower().startswith("/rule34"):
-            command = message.content.split(" ",3)
-            results = rule34.search_rule_34(command[1] if len(command) >=3 else 1,command[2] if len(command) >=3 else command[1])
-            if results != None:
-                for result in results:
-                    await message.channel.send(result.get("file_url","image not found"))
-            else:
-                await message.channel.send("No results found :(")
-
-        elif str(message.content).lower().startswith("/kanye"):
-            embed = discord.Embed(title=kanye.get_kanye_quote())
-            embed.set_author(name="Kanye East",icon_url="https://i.imgflip.com/41j06n.png")
-            await message.channel.send(embed=embed)
+        #responds with a magic8ball answer
+        elif str(message.content).startswith("/magic8ball"):
+            await message.channel.send(magic_eight_ball.magic_eight_ball())
             
+        #takes input of # of dice and #of dice sides (1d6,2d8,etc), then responds with the results of those dice rolls
         elif str(message.content).lower().startswith("/roll"):
             text = str(message.content).replace("/roll ","")
             response = dice_roll.roll_dice(text)
@@ -104,53 +98,7 @@ class MyClient(discord.Client):
             await bridge.send(responseStr)
             bot.send_message(TELEGRAM_CHAT,f"{message.author}: {message.content}")
             bot.send_message(TELEGRAM_CHAT,responseStr)
-        
-        elif str(message.content).lower().startswith("/add_countdown"):
-            response = countdown.add_countdown(message.content)
-            bridge = client.get_channel(BRIDGE_CHAT)
-            await bridge.send((response))
-            bot.send_message(TELEGRAM_CHAT,f"{message.author}: {message.content}")
-            bot.send_message(TELEGRAM_CHAT,f"{response}")
-        
-        elif str(message.content).startswith("/add_role"):
-            role_name = str(message.content).replace ("/add_role ","")
-            await discord_roles.add_role_to_user(message,role_name)
-
-        elif str(message.content).startswith("/rainbow"):
-            await discord_roles.rainbow_mode(message)
             
-        elif str(message.content).lower().startswith("/weather"):
-            if message.content.replace("/weather","").strip() == "":
-                await d_weather.get_current_weather(message)
-            elif message.content.replace("/weather","").strip() == "week":
-                await d_weather.get_weekly_weather(message)
-
-        elif str(message.content).startswith("/generate_role_message"):
-            role_chat = client.get_channel(ROLE_CHAT)
-            await discord_roles.generate_role_message(role_chat)
-            
-        elif str(message.content).startswith("/rolemsg_add"):
-            role_info = str(message.content).replace("/rolemsg_add ","")
-            with open("./json/role_message.json","r") as r:
-                role_chat = client.get_channel(ROLE_CHAT)
-                role_message = json.load(r)
-            await discord_roles.add_role_to_role_message(role_info,role_message,role_chat)
-        
-        #deletes last n messages
-        elif str(message.content).startswith("/trim"):
-            await admin.trim(self,message)    
-        
-        elif str(message.content).startswith("/ignore_channel"):
-            await admin.ignore_channel(self,message)
-            await message.channel.send("Ignoring Channel")
-        
-        elif str(message.content).startswith("/magic8ball"):
-            await message.channel.send(magic_eight_ball.magic_eight_ball())
-        
-        #img command to reflect telegram bot
-        elif str(message.content).startswith("/img"):
-            await d_images.send_image(self,message)
-        
         elif str(message.content).startswith("/quote"):
             quote_text = str(message.content).replace("/quote","")
             if quote_text.startswith(" "):
@@ -160,6 +108,18 @@ class MyClient(discord.Client):
             bot.send_message(TELEGRAM_CHAT,f"{message.author}: {message.content}")
             bot.send_message(TELEGRAM_CHAT,response)
         
+#<------------------------MEME COMMANDS------------------------------------------------>
+        
+        elif str(message.content).lower().startswith("/kanye"):
+            embed = discord.Embed(title=kanye.get_kanye_quote())
+            embed.set_author(name="Kanye East",icon_url="https://i.imgflip.com/41j06n.png")
+            await message.channel.send(embed=embed)
+            
+        #makes your role color a changing rainbow
+        elif str(message.content).startswith("/rainbow"):
+            await discord_roles.rainbow_mode(message)
+        
+        #summons waifu images
         elif str(message.content).lower().startswith("/waifu"):
             command = message.content.split (" ",3)
             print(command)
@@ -180,9 +140,58 @@ class MyClient(discord.Client):
             else:
                 print(url)
                 await message.channel.send(url)
+
+#<------------------------ADMIN COMMANDS----------------------------------------------->
         
+        #lists all server roles in discord chat
+        elif str(message.content).startswith("/list_roles"):
+            await discord_roles.list_roles(message)
+    
+        #deletes last n messages
+        elif str(message.content).startswith("/trim"):
+            await admin.trim(self,message)    
+        
+        #adds a channel to the ignored_channels list, and no longer bridges, or responds to commands on that channel
+        elif str(message.content).startswith("/ignore_channel"):
+            await admin.ignore_channel(self,message)
+            await message.channel.send("Ignoring Channel")
+        
+        elif str(message.content).startswith("/add_role"):
+            role_name = str(message.content).replace ("/add_role ","")
+            await discord_roles.add_role_to_user(message,role_name)
+            
+        elif str(message.content).startswith("/generate_role_message"):
+            role_chat = client.get_channel(ROLE_CHAT)
+            await discord_roles.generate_role_message(role_chat)
+        
+        elif str(message.content).startswith("/rolemsg_add"):
+            role_info = str(message.content).replace("/rolemsg_add ","")
+            with open("./json/role_message.json","r") as r:
+                role_chat = client.get_channel(ROLE_CHAT)
+                role_message = json.load(r)
+            await discord_roles.add_role_to_role_message(role_info,role_message,role_chat)
+            
+#<------------------------NSFW COMMANDS----------------------------------------------->
+        
+        elif str(message.content).lower().startswith("/rule34"):
+            command = message.content.split(" ",3)
+            results = rule34.search_rule_34(command[1] if len(command) >=3 else 1,command[2] if len(command) >=3 else command[1])
+            if results != None:
+                for result in results:
+                    await message.channel.send(result.get("file_url","image not found"))
+            else:
+                await message.channel.send("No results found :(")
+        
+#<------------------------QOL COMMANDS----------------------------------------------->
+        elif str(message.content).lower().startswith("/weather"):
+            if message.content.replace("/weather","").strip() == "":
+                await d_weather.get_current_weather(message)
+            elif message.content.replace("/weather","").strip() == "week":
+                await d_weather.get_weekly_weather(message)
+
+#<------------------------Bridging--------------------------------------------------->        
         #bridges the message:
-        if message.channel.nsfw and not settings.get("bridge_nsfw_channels"):
+        if message.channel.nsfw and not settings.get("telegram_bridge").get("bridge_nsfw_channels",False):
             print("NSFW channel - not bridging")
             return
         else:

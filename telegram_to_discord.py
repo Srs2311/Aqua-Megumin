@@ -6,10 +6,6 @@ from environment_control import *
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode=None)
 
-def download_image(url,destination,name):
-        r = requests.get(url,allow_redirects=True)
-        open(f"{destination}/{name}.png","wb").write(r.content)
-
 def refresh_settings():
     with open("./json/config.json","r") as config_json:
         config = json.load(config_json)
@@ -21,7 +17,6 @@ def bridge_message_embed(message):
     photos = bot.get_user_profile_photos(message.from_user.id)
     pfp = photos.photos[0][0]
     url = bot.get_file_url(pfp.file_id)
-
 
     embed_bridge = requests.post(
                     f"https://discord.com/api/v9/channels/{BRIDGE_CHAT}/messages",
@@ -48,37 +43,25 @@ def bridge_photo_embed(message):
     )
     return embed_bridge
 
-
-
-
-
-
 def sticker_embed(message):
-    print("sticker detected")
     photos = bot.get_user_profile_photos(message.from_user.id)
     pfp = photos.photos[0][0]
     url = bot.get_file_url(pfp.file_id)
     config = refresh_settings()
     sticker_url = bot.get_file_url(message.sticker.file_id)
-    download_image(url=sticker_url,destination="/tmp/",name=message.sticker.file_unique_id)
         
     embed_bridge = requests.post(
                         f"https://discord.com/api/v9/channels/{BRIDGE_CHAT}/messages",
                         headers=headers,
                         json={"embeds": [{"title":f"{message.chat.title}" if config["chat_name_in_title"] else "",
-                            "description":f"Testing",
-                            "author":{"name":f"{message.from_user.username}","icon_url":url},
-                            "image":{"url":f"attachment://{message.sticker.file_unique_id}.png",
-                            "type":"rich"}
-                        }]},
-                        files = {(f"/tmp/{message.sticker.file_unique_id}.png", open(f"/tmp/{message.sticker.file_unique_id}.png", 'rb'))})
+                                            "author":{"name":f"{message.from_user.username}","icon_url":url},
+                                            "image":{"url":sticker_url}
+                            
+                                }]})
                         
 
     return embed_bridge
     
-
-
-
 def bridge_video(message):
     """Sends a video to discord via API call, currently the only way to send videos as you cannot use them in embeds. Returns request info"""
     config = refresh_settings()
@@ -97,5 +80,30 @@ def bridge_message(message):
                     f"https://discord.com/api/v6/channels/{BRIDGE}/messages",
                     headers=headers, 
                     json={"content": f"{message.from_user}{message.text}"}
+                )
+    return send_message
+
+def bridge_response(response:str, embed:bool=False, embed_data:dict=None):
+    """Takes a String response, and sends it to discord. If embeds are enabled, uses embed
+
+    Args:
+        response (Str): _description_
+        embed (Bool, optional): . Defaults to None.
+        embed_data (Dict, optional): Data for the embed, description, author, etc. Defaults to None.
+
+    Returns:
+        Dict: Response data from discord API call
+    """
+    if embed:
+        send_message = requests.post(
+            f"https://discord.com/api/v6/channels/{BRIDGE}/messages",
+                    headers=headers, 
+                        json={"embeds": [{"description":f"{response}", "author":{"name":f"{embed_data["author"]}","icon_url":embed_data["author_icon"]}}]}
+        )
+    else:
+        send_message = requests.post(
+                    f"https://discord.com/api/v6/channels/{BRIDGE}/messages",
+                    headers=headers, 
+                    json={"content": f"{response}"}
                 )
     return send_message
