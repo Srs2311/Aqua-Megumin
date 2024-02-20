@@ -9,21 +9,20 @@ import countdown as t_countdown
 import dice_roll
 import telegram_to_discord as t2d
 import kanye
-from environment_control import *
+import weather_check
+import settings_management as sm
 
-bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode=None)
-
-#discord api call headers
-headers = {'Authorization': f"Bot {DISCORD_TOKEN}"}
 
 def load_settings():
     with open("./json/config.json") as config:
         settings = json.load(config)
-        return settings
-
+    return settings
 
 settings = load_settings()
-
+#discord api call headers
+headers = {'Authorization': f"Bot {settings.get("tokens").get("discord")}"}
+#creates the telegram bot
+bot = telebot.TeleBot(settings.get("tokens").get("telegram"), parse_mode=None)
 #------------------------------------------------------------------------------------------------------------------------#
 
 #<---------------------------------------------Useful, but fun Commands-------------------------------------------------->
@@ -71,20 +70,10 @@ def roll(message):
 #<---------------IMAGE COMMANDS----------------------------------------->
 
 #adds a photo to the photo library    
-@bot.message_handler(commands=["addphoto"])
+@bot.message_handler(commands=["addphoto","add_photo"])
 def add_photo_with_reply(message):
     t_images.add_photo(bot,message)
     
-@bot.message_handler(content_types=["photo,add_photo"])
-def photo_handler(message):
-    if message.caption:
-        if "/addphoto" in message.caption or "/add_photo" in message.caption:
-            t_images.add_photo(bot,message)
-    #image bridging
-    t_images.download_telegram_image(bot,message,name=str(message.photo[-1].file_unique_id))
-    if settings["discord_bridge"]["use_embeds"] == True:
-        t2d.bridge_photo_embed(message)
-        
 #command to pull an image from image.json and post in chat
 @bot.message_handler(commands=["img"])
 def send_image(message):
@@ -122,6 +111,7 @@ def add_gif(message):
             imagesList.write(json.dumps(gif_list))
             
 #<------------------COUNTDOWN COMMANDS--------------------------------------->
+
 @bot.message_handler(commands=["countdown"])
 def countdown(message):
     response = t_countdown.countdown(str(message.text))
@@ -140,7 +130,7 @@ def add_countdown(message):
 def rand_kanye(message):
     response = kanye.get_kanye_quote()
     bot.reply_to(message,response)
-    bridge_commands(message,response,response_embed={"author":"Kanye East", "author_icon":"https://i.imgflip.com/41j06n.png"})
+    bridge_commands(message,response, embed=True, response_embed={"author":"Kanye East", "author_icon":"https://i.imgflip.com/41j06n.png"})
 
 #<---------------------------------------------Admin Commands------------------------------------------------------------>
 
@@ -172,23 +162,34 @@ def send_user_info(message):
     bot.send_photo(message.chat.id,photo=str(pfp.file_id))
     t2d.bridge_message_embed(message)
 
+#<---------------------------------------------QOL Commands-------------------------------------------------------------->
+
+@bot.message_handler(commands=["weather"])
+def weather(message):
+    weather_results = weather_check.get_daily_forecast()
+    bot.send_message(message.chat.id,weather_results["detailedForecast"])
+    bridge_commands(message, weather_results.get("detailedForecast","Weather unavailable"), embed = True, response_embed={"author":"Your Local Weatherman","author_icon":weather_results.get("icon")})
+
 #<---------------------------------------------Bridging logic------------------------------------------------------------>
 
+
+@bot.message_handler(content_types=["photo"])
+def photo_handler(message):
+    if message.caption:
+        if "/addphoto" in message.caption or "/add_photo" in message.caption:
+            t_images.add_photo(bot,message)
+    #image bridging
+    t_images.download_telegram_image(bot,message,name=str(message.photo[-1].file_unique_id))
+    if settings["discord_bridge"]["use_embeds"] == True:
+        t2d.bridge_photo_embed(message)
 
 @bot.message_handler(content_types=["sticker"])
 def sticker_handler(message):
     t2d.sticker_embed(message)
 
-@bot.message_handler(content_types=["photo"])
-def sticker_handler(message):
-    t2d.bridge_photo_embed(message)
-
-
-
 #forwards any non-command messages 
 @bot.message_handler(func=lambda m: True)
 def discord_bridge(message):
-    print(message)
     if message.text:
         t2d.bridge_message_embed(message)
     if message.photo:
@@ -201,14 +202,14 @@ def discord_bridge(message):
         t2d.sticker_embed(message)
         
 #sends command and response to discord, called in other functions
-def bridge_commands(message,response,response_embed=None):
+def bridge_commands(message,response, embed:bool=False,  response_embed:dict=None):
     if settings["discord_bridge"]["use_embeds"] == True:
         t2d.bridge_message_embed(message)
     else:
         t2d.bridge_message(message)
          
     if response != None:
-        t2d.bridge_response(response,embed=settings["discord_bridge"]["use_embeds"],embed_data=response_embed)
+        t2d.bridge_response(response,embed=embed,embed_data=response_embed)
 
 bot.infinity_polling()
 

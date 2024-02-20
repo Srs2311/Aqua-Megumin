@@ -15,7 +15,7 @@ import kanye
 import rule34
 import magic_eight_ball
 import waifu
-from environment_control import *
+
 
 
 #grabs and returns config settings for bot
@@ -28,13 +28,14 @@ def refresh_settings():
         ignored_channel_ids.append(channel.get("id",None))
     return settings,ignored_channel_ids
 
+settings,ignored_channels = refresh_settings()
 
-bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode=None) # You can set parse_mode by default. HTML or MARKDOWN
+bot = telebot.TeleBot(settings.get("tokens").get("telegram"), parse_mode=None) # You can set parse_mode by default. HTML or MARKDOWN
 
 class MyClient(discord.Client):
     async def on_ready(self):
         print('Logged on as', self.user)
-        bridge = client.get_channel(BRIDGE_CHAT)
+        bridge = client.get_channel(int(settings.get("discord_bridge").get("discord_bridge_chat")))
         embed = discord.Embed(title="Explosion! Bot is online")
         embed.set_image(url = waifu.get_waifu("sfw","megumin"))
         await bridge.send(embed=embed)
@@ -70,18 +71,18 @@ class MyClient(discord.Client):
         #sends the time until a requested countdown
         elif str(message.content).startswith("/countdown"):
             response = countdown.countdown(message.content)
-            bridge = client.get_channel(BRIDGE_CHAT)
+            bridge = client.get_channel(settings.get("discord_bridge").get("discord_bridge_chat"))
             await bridge.send(response)
-            bot.send_message(TELEGRAM_CHAT,f"{message.author}: {message.content}")
-            bot.send_message(TELEGRAM_CHAT,response)
+            bot.send_message(settings.get("telegram_bridge").get("telegram_chat"),f"{message.author}: {message.content}")
+            bot.send_message(settings.get("telegram_bridge").get("telegram_chat"),response)
         
         #adds a countdown  
         elif str(message.content).lower().startswith("/add_countdown"):
             response = countdown.add_countdown(message.content)
-            bridge = client.get_channel(BRIDGE_CHAT)
+            bridge = client.get_channel(settings.get("discord_bridge").get("discord_bridge_chat"))
             await bridge.send((response))
-            bot.send_message(TELEGRAM_CHAT,f"{message.author}: {message.content}")
-            bot.send_message(TELEGRAM_CHAT,f"{response}")
+            bot.send_message(settings.get("telegram_bridge").get("telegram_chat"),f"{message.author}: {message.content}")
+            bot.send_message(settings.get("telegram_bridge").get("telegram_chat"),f"{response}")
 
         #responds with a magic8ball answer
         elif str(message.content).startswith("/magic8ball"):
@@ -94,10 +95,10 @@ class MyClient(discord.Client):
             responseStr = ""
             for i in range(0,len(response)):
                 responseStr = f"{response[i]}   {responseStr}"
-            bridge = client.get_channel(BRIDGE_CHAT)
+            bridge = client.get_channel(settings.get("discord_bridge").get("discord_bridge_chat"))
             await bridge.send(responseStr)
-            bot.send_message(TELEGRAM_CHAT,f"{message.author}: {message.content}")
-            bot.send_message(TELEGRAM_CHAT,responseStr)
+            bot.send_message(settings.get("telegram_bridge").get("telegram_chat"),f"{message.author}: {message.content}")
+            bot.send_message(settings.get("telegram_bridge").get("telegram_chat"),responseStr)
             
         elif str(message.content).startswith("/quote"):
             quote_text = str(message.content).replace("/quote","")
@@ -105,8 +106,8 @@ class MyClient(discord.Client):
                 quote_text = quote_text[1:]
             response = quotes.fetch_quote(quote_text)
             await message.channel.send(response)
-            bot.send_message(TELEGRAM_CHAT,f"{message.author}: {message.content}")
-            bot.send_message(TELEGRAM_CHAT,response)
+            bot.send_message(settings.get("telegram_bridge").get("telegram_chat"),f"{message.author}: {message.content}")
+            bot.send_message(settings.get("telegram_bridge").get("telegram_chat"),response)
         
 #<------------------------MEME COMMANDS------------------------------------------------>
         
@@ -161,13 +162,13 @@ class MyClient(discord.Client):
             await discord_roles.add_role_to_user(message,role_name)
             
         elif str(message.content).startswith("/generate_role_message"):
-            role_chat = client.get_channel(ROLE_CHAT)
+            role_chat = client.get_channel(settings.get("discord").get("role_chat"))
             await discord_roles.generate_role_message(role_chat)
         
         elif str(message.content).startswith("/rolemsg_add"):
             role_info = str(message.content).replace("/rolemsg_add ","")
             with open("./json/role_message.json","r") as r:
-                role_chat = client.get_channel(ROLE_CHAT)
+                role_chat = client.get_channel(settings.get("discord").get("role_chat"))
                 role_message = json.load(r)
             await discord_roles.add_role_to_role_message(role_info,role_message,role_chat)
             
@@ -201,9 +202,9 @@ class MyClient(discord.Client):
     #sends telegram message when user joins/leaves voice channel
     async def on_voice_state_update(self, member, before, after):
         if str(after.channel) == "General":
-            bot.send_message(chat_id,f"{member} has joined General")
+            bot.send_message(settings.get("telegram_bridge").get("telegram_chat"),f"{member} has joined General")
         elif str(before.channel) == "General":
-            bot.send_message(chat_id,f"{member} has left General")
+            bot.send_message(settings.get("telegram_bridge").get("telegram_chat"),f"{member} has left General")
 
     async def on_raw_reaction_add(self,payload):
         role_message = discord_roles.refresh_role_message()
@@ -219,4 +220,4 @@ class MyClient(discord.Client):
 intents = discord.Intents.all()
 intents.message_content = True
 client = MyClient(intents=intents)
-client.run(DISCORD_TOKEN)
+client.run(settings.get("tokens").get("discord"))

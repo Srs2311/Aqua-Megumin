@@ -1,7 +1,6 @@
 import json
 import discord
 import time
-from environment_control import *
 
 
 def refresh_server_roles(message):

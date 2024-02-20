@@ -2,9 +2,10 @@ import discord
 import json
 import requests
 import telebot
-from environment_control import *
+import settings_management as sm
 
-bot = telebot.TeleBot(TELEGRAM_TOKEN, parse_mode=None) # You can set parse_mode by default. HTML or MARKDOWN
+settings = sm.refresh_settings()
+bot = telebot.TeleBot(settings["tokens"]["telegram"], parse_mode=None) # You can set parse_mode by default. HTML or MARKDOWN
 
 async def add_photo(self,message,image_gallery):
     if len(message.attachments) > 0:
@@ -21,5 +22,5 @@ async def add_photo(self,message,image_gallery):
 async def send_image(self,message):
     image_request = str(message.content).replace("/img ", "")
     await message.channel.send(file=discord.File(f"./image_library/{image_request}.png"))
-    bot.send_message(TELEGRAM_CHAT,str(message.content))
-    bot.send_photo(TELEGRAM_CHAT,photo=open(f"./image_library/{image_request}.png","rb"))
+    bot.send_message(settings["telegram_bridge"]["telegram_chat"],str(message.content))
+    bot.send_photo(settings["telegram_bridge"]["telegram_chat"],photo=open(f"./image_library/{image_request}.png","rb"))
